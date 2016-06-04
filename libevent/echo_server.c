@@ -7,8 +7,16 @@
 
 #include <event.h>
 #include <netdb.h>
+#include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/socket.h>
+
+struct client
+{
+    struct event *revent;
+    struct event *wevent;
+};
 
 int create_and_bind(const char *ip, const char *port)
 {
@@ -56,6 +64,51 @@ int create_and_bind(const char *ip, const char *port)
     else
     {
         return -1;
+    }
+}
+
+void read_cb(int fd, short ev_kind, void *arg)
+{
+}
+
+void accept_cb(int fd, short ev_kind, void *arg)
+{
+    socklen_t addrlen;
+    struct sockaddr addr;
+
+    while (1)
+    {
+        int client_fd = accept(fd, &addr, &addrlen);
+        if (client_fd < 0)
+        {
+            if (errno == EAGAIN)
+            {
+                continue;
+            }
+            else
+            {
+                break;
+            }
+        }
+        else
+        {
+            struct client *c = (struct client*)calloc(1, sizeof(struct client));
+            if (c == NULL)
+            {
+                continue;
+            }
+
+            struct event *ev = (struct event*)calloc(1, sizeof(struct event));
+            if (ev == NULL)
+            {
+                free(c);
+                continue;
+            }
+
+            c->revent = ev;
+            event_set(ev, client_fd, EV_READ, read_cb, c);
+            event_add(ev, NULL);
+        }
     }
 }
 
