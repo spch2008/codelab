@@ -8,6 +8,7 @@
 #include <event.h>
 #include <netdb.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -67,8 +68,67 @@ int create_and_bind(const char *ip, const char *port)
     }
 }
 
+void del_client(struct client *c)
+{
+    if (c->revent != NULL)
+    {
+        event_del(c->revent);
+    }
+
+    if (c->wevent != NULL)
+    {
+        event_del(c->wevent);
+    }
+
+    free(c);
+}
+
+void write_cb(int fd, short ev_kind, void *arg)
+{
+    char buff[50] = {"Hello Client!"};
+    ssize_t write_cnt;
+
+    write_cnt = write(fd, buff, strlen(buff));
+    if (write_cnt != strlen(buff))
+    {
+        printf("write error\n");
+    }
+    else
+    {
+        printf("write to client: %s\n", buff);
+    }
+
+    del_client((struct client*)arg);
+}
+
 void read_cb(int fd, short ev_kind, void *arg)
 {
+    char buff[50]; 
+    ssize_t read_cnt;
+
+    struct client *c = (struct client*)arg;
+
+    read_cnt = read(fd, buff, sizeof(buff));
+    if (read_cnt <= 0)
+    {
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            del_client(c);
+        }
+    }
+    else
+    {
+        c->wevent = (struct event*)calloc(1, sizeof(struct event));
+        if (c->wevent == NULL)
+        {
+            del_client(c);
+        }
+
+        event_set(c->wevent, fd, EV_WRITE, write_cb, c);
+        event_add(c->wevent, NULL);
+
+        printf("recv from client: %s\n", buff);
+    }
 }
 
 void accept_cb(int fd, short ev_kind, void *arg)
@@ -106,8 +166,8 @@ void accept_cb(int fd, short ev_kind, void *arg)
             }
 
             c->revent = ev;
-            event_set(ev, client_fd, EV_READ, read_cb, c);
-            event_add(ev, NULL);
+            event_set(c->revent, client_fd, EV_READ, read_cb, c);
+            event_add(c->revent, NULL);
         }
     }
 }
