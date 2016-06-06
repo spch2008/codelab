@@ -48,8 +48,6 @@ int create_and_bind(const char *ip, const char *port)
             break;
         }
 
-        evutil_make_socket_nonblocking(sfd);
-
         res = listen(sfd, SOMAXCONN);
         if (res != 0)
         {
@@ -60,8 +58,7 @@ int create_and_bind(const char *ip, const char *port)
 
     freeaddrinfo(result);
 
-    //if (res == 0 && evutil_make_socket_nonblocking(sfd) == 0)
-    if (res == 0)
+    if (res == 0 && evutil_make_socket_nonblocking(sfd) == 0)
     {
         return sfd;
     }
