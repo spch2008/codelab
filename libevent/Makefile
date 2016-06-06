@@ -20,4 +20,4 @@ $(CLI) : echo_client.o
 	$(CC) -c $< -o $@
 
 clean:
-	$(RM) $(OBJS) $(SER)
+	$(RM) $(OBJS) $(SER) $(CLI)

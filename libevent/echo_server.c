@@ -48,6 +48,8 @@ int create_and_bind(const char *ip, const char *port)
             break;
         }
 
+        evutil_make_socket_nonblocking(sfd);
+
         res = listen(sfd, SOMAXCONN);
         if (res != 0)
         {
@@ -58,7 +60,8 @@ int create_and_bind(const char *ip, const char *port)
 
     freeaddrinfo(result);
 
-    if (res == 0 && evutil_make_socket_nonblocking(sfd) == 0)
+    //if (res == 0 && evutil_make_socket_nonblocking(sfd) == 0)
+    if (res == 0)
     {
         return sfd;
     }
@@ -70,16 +73,8 @@ int create_and_bind(const char *ip, const char *port)
 
 void del_client(struct client *c)
 {
-    if (c->revent != NULL)
-    {
-        event_del(c->revent);
-    }
-
-    if (c->wevent != NULL)
-    {
-        event_del(c->wevent);
-    }
-
+    free(c->revent);
+    free(c->wevent);
     free(c);
 }
 
@@ -136,19 +131,13 @@ void accept_cb(int fd, short ev_kind, void *arg)
     socklen_t addrlen;
     struct sockaddr addr;
 
+    addrlen = sizeof(struct sockaddr);
     while (1)
     {
         int client_fd = accept(fd, &addr, &addrlen);
         if (client_fd < 0)
         {
-            if (errno == EAGAIN)
-            {
-                continue;
-            }
-            else
-            {
-                break;
-            }
+            break;
         }
         else
         {
@@ -166,7 +155,7 @@ void accept_cb(int fd, short ev_kind, void *arg)
             }
 
             c->revent = ev;
-            event_set(c->revent, client_fd, EV_READ, read_cb, c);
+            event_set(c->revent, client_fd, EV_READ|EV_WRITE, read_cb, c);
             event_add(c->revent, NULL);
         }
     }

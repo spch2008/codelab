@@ -57,6 +57,16 @@ int main(int argc, char *argv[])
         printf("write error!\n");
     }
 
+    int read_cnt = read(fd, buff, sizeof(buff));
+    if (read_cnt > 0)
+    {
+        printf("recv from server: %s\n", buff);
+    }
+    else
+    {
+        printf("read error\n");
+    }
+
     freeaddrinfo(result);
     return 0;
 }
