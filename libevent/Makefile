@@ -8,8 +8,12 @@ OBJS=$(SRCS:.c=.o)
 LIBS=-levent
 
 SER = server
+CLI = client
 
-$(SER) : $(OBJS)
+$(SER) : echo_server.o
+	$(CC) $^ $(CFLAGS) $(LIBS) -o $@
+
+$(CLI) : echo_client.o
 	$(CC) $^ $(CFLAGS) $(LIBS) -o $@
 
 %.o : %.c
