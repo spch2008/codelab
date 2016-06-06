@@ -7,13 +7,13 @@ OBJS=$(SRCS:.c=.o)
 
 LIBS=-levent
 
-EXEC = main
+SER = server
 
-$(EXEC) : $(OBJS)
+$(SER) : $(OBJS)
 	$(CC) $^ $(CFLAGS) $(LIBS) -o $@
 
 %.o : %.c
 	$(CC) -c $< -o $@
 
 clean:
-	$(RM) $(OBJS) $(EXEC)
+	$(RM) $(OBJS) $(SER)

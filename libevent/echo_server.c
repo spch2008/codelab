@@ -174,5 +174,26 @@ void accept_cb(int fd, short ev_kind, void *arg)
 
 int main(int argc, char argv[])
 {
+    const char *ip = "127.0.0.1";
+    const char *port = "2016";
+
+    int sfd = create_and_bind(ip, port);
+    if (sfd == -1)
+    {
+        return -1;
+    }
+
+    struct event_base *base = event_init();
+    if (base == NULL)
+    {
+        return -1;
+    }
+
+
+    struct event ev;
+    event_set(&ev, sfd, EV_READ|EV_PERSIST, accept_cb, NULL);
+    event_add(&ev, NULL);
+
+    event_base_dispatch(base);
     return 0;
 }
