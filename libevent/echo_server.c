@@ -21,7 +21,7 @@ struct client
 
 int create_and_bind(const char *ip, const char *port)
 {
-    struct addrinfo hint, *result;
+    struct addrinfo hint, *result = NULL;
     int res, sfd = -1;
 
     memset(&hint, 0, sizeof(struct addrinfo));
