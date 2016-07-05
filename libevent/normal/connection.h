@@ -10,10 +10,16 @@
 
 #include <event.h>
 
+enum ConnStatus
+{
+    
+};
+
 struct Connection
 {
     int fd;
     int left_size;
+    int conn_status;
 
     char *read_buf;
     int   read_size;
