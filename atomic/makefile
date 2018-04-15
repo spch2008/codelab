@@ -1,4 +1,4 @@
-CC = g++
+CC = g++ -g
 RM = rm -rf
 CFLAGS = -std=c++11 -lpthread -O2
 

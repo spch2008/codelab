@@ -3,11 +3,11 @@
 #include <iostream>
 #include <sstream>
 
-struct lock_t {
+struct SpinLock {
   static const size_t max_locks = 5;
   std::atomic<int> locks[max_locks];
 
-  bool lock(size_t const thread_id) {
+  bool Lock(size_t const thread_id) {
 
     locks[thread_id].store(1, std::memory_order_release);    // Store
     //locks[thread_id].store(1, std::memory_order_seq_cst);    // Store
@@ -20,26 +20,26 @@ struct lock_t {
     return true;
   }
 
-  void unlock(size_t const thread_id) {
+  void Unlock(size_t const thread_id) {
     locks[thread_id].store(0, std::memory_order_release);
   }
 };
 
-lock_t custom_lock;
+SpinLock spin_lock;
 int counter = 0;
 
-void test(size_t const thread_id)  {
+void Accumulate(size_t const thread_id)  {
   for (size_t i = 0; i < 100000; ++i) {
-    while (!custom_lock.lock(thread_id));
+    while (!spin_lock.Lock(thread_id));
     ++counter;
-    custom_lock.unlock(thread_id);
+    spin_lock.Unlock(thread_id);
   }
 }
 
 int main() {
   counter = 0;
-  std::thread t0([&]() { test(0); });
-  std::thread t1([&]() { test(1); });
+  std::thread t0([&]() { Accumulate(0); });
+  std::thread t1([&]() { Accumulate(1); });
   t0.join(); t1.join();
 
   std::cout << counter << std::endl;
