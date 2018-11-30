@@ -9,8 +9,8 @@ struct LRUHandle {
   void* value;
   int key;
 
-  bool in_cache_index;
-  int refs;
+  int ref;
+  bool valid;
 };
 
 class LRUCacheIndex {
@@ -29,19 +29,20 @@ class LRUCache {
   ~LRUCache();
 
   bool Insert(const int key, void* value);
-  LRUHandle* Lookup(const int key);
-
   void Erase(const int key);
+
+  LRUHandle* Lookup(const int key);
   void Release(LRUHandle* handle);
 
  private:
-  void LRU_Remove(LRUHandle* e);
-  void LRU_Append(LRUHandle*list, LRUHandle* e);
+  void Link_Remove(LRUHandle* e);
+  void Link_Append(LRUHandle*list, LRUHandle* e);
+
   void Ref(LRUHandle* e);
   void Unref(LRUHandle* e);
+
   bool RemoveFromLRU(LRUHandle* e);
 
-  std::mutex mutex_;
   size_t usage_;
   size_t capacity_;
 
@@ -62,7 +63,7 @@ LRUCache::~LRUCache() {
   //assert(in_use_.next == &in_use_); // 有未释放的。
   for (LRUHandle* e = lru_.next; e != &lru_; ) {
     LRUHandle* next = e->next;
-    e->in_cache_index = false;
+    e->valid = false;
     Unref(e);
     e = next;
   }
@@ -73,7 +74,6 @@ bool LRUCache::Insert(const int key, void* value) {
   e->value = value;
   e->key = key;
 
-  std::unique_lock<std::mutex> l(mutex_);
   while (usage_ >= capacity_ && lru_.next != &lru_) {
     LRUHandle* old = lru_.next;
     RemoveFromLRU(cache_index_.Erase(old->key));
@@ -81,13 +81,14 @@ bool LRUCache::Insert(const int key, void* value) {
 
   if (usage_ < capacity_) {
     usage_ += 1;
-    LRU_Append(&lru_, e.get());
+    Link_Append(&lru_, e.get());
 
-    LRUHandle* old_same_key_handle = cache_index_.Insert(key, e.release());
-    e->in_cache_index = true;
-    e->refs = 1; // due to exist in cache_index.
+    LRUHandle* old_handle = cache_index_.Insert(key, e.release());
+    RemoveFromLRU(old_handle);
 
-    RemoveFromLRU(old_same_key_handle);
+    e->valid = true;
+    e->ref = 1; // due to exist in cache_index.
+
     return true;
   }
 
@@ -96,51 +97,50 @@ bool LRUCache::Insert(const int key, void* value) {
 
 void LRUCache::Ref(LRUHandle* e) {
   // First, on lru_ list, move to in_use_ list.
-  if (e->refs == 1 && e->in_cache_index) {
-    LRU_Remove(e);
-    LRU_Append(&in_use_, e);
+  // 如果没有valid的判断，无法确定是否是第一次进入
+  if (e->ref == 1 && e->valid) { // First come.
+    Link_Remove(e);
+    Link_Append(&in_use_, e);
   }
-  e->refs++;
+  e->ref++;
 }
 
 void LRUCache::Unref(LRUHandle* e) {
-  e->refs--;
-  if (e->refs == 0) {
+  e->ref--;
+  if (e->ref == 0) {
+    usage_ -= 1;
     delete e;
-  } else if (e->in_cache_index && e->refs == 1) {
+  } else if (e->valid && e->ref == 1) { // Last use.
     // Move from ins_use_ list to lru_ list.
-    LRU_Remove(e);
-    LRU_Append(&lru_, e);
+    Link_Remove(e);
+    Link_Append(&lru_, e);
   }
 }
 
 LRUHandle* LRUCache::Lookup(const int key) {
-  std::unique_lock<std::mutex> l(mutex_);
   LRUHandle* e = cache_index_.Lookup(key);
   if (e != NULL) {
     Ref(e);
   }
 
-  return e; 
+  return e;
 }
 
 void LRUCache::Release(LRUHandle* handle) {
-  std::unique_lock<std::mutex> l(mutex_);
   Unref(handle);
 }
 
 void LRUCache::Erase(const int key) {
-  std::unique_lock<std::mutex> l(mutex_);
   // 从索引中删除就找不到了，等全部释放后即删除。
   RemoveFromLRU(cache_index_.Erase(key));
 }
 
-void LRUCache::LRU_Remove(LRUHandle* e) {
+void LRUCache::Link_Remove(LRUHandle* e) {
   e->next->prev = e->prev;
   e->prev->next = e->next;
 }
 
-void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
+void LRUCache::Link_Append(LRUHandle* list, LRUHandle* e) {
   e->next = list;
   e->prev = list->prev;
   e->prev->next = e;
@@ -149,10 +149,11 @@ void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
 
 bool LRUCache::RemoveFromLRU(LRUHandle* e) {
   if (e != NULL) {
-    LRU_Remove(e);
-    e->in_cache_index = false;
+    Link_Remove(e); // 处于悬浮状态
+    e->valid = false;
     Unref(e);
   }
+
   return e != NULL;
 }
 
